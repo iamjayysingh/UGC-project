@@ -10,10 +10,14 @@ import MyGenerations from "./pages/MyGenerations";
 import Loading from "./pages/Loading";
 import Community from "./pages/Community";
 import Generate from "./pages/Generate";
+import { Toaster } from "react-hot-toast";
 
 function App() {
   return (
     <>
+      <Toaster
+        toastOptions={{ style: { background: "#333", color: "white" } }}
+      />
       <SoftBackdrop />
       <LenisScroll />
       <Navbar />

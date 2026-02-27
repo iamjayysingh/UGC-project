@@ -86,7 +86,12 @@ export const createProject = async (req: Request, res: Response) => {
 
     tempProjectId = project.id;
 
-    const model = "gemini-3-pro-image-preview";
+    const imageGenerationModels = [
+      process.env.GEMINI_IMAGE_MODEL?.trim(),
+      "gemini-2.5-flash-image-preview",
+      "gemini-2.0-flash-preview-image-generation",
+      "gemini-3-pro-image-preview",
+    ].filter(Boolean) as string[];
 
     const generationConfig: GenerateContentConfig = {
       maxOutputTokens: 32768,
@@ -119,8 +124,8 @@ export const createProject = async (req: Request, res: Response) => {
 
     // image to base64 structure for ai
 
-    const img1base64 = loadImage(images[0].path, images[0].mimeType);
-    const img2base64 = loadImage(images[1].path, images[0].mimeType);
+    const img1base64 = loadImage(images[0].path, images[0].mimetype);
+    const img2base64 = loadImage(images[1].path, images[1].mimetype);
 
     const prompt = {
       text: `
@@ -137,12 +142,28 @@ ${userPrompt}
 `,
     };
 
-    // generate the image using the ai models
-    const response: any = await ai.models.generateContent({
-      model,
-      contents: [img1base64, img2base64, prompt],
-      config: generationConfig,
-    });
+    // generate the image using the first available model
+    let response: any = null;
+    let lastModelError: any = null;
+    for (const model of imageGenerationModels) {
+      try {
+        response = await ai.models.generateContent({
+          model,
+          contents: [img1base64, img2base64, prompt],
+          config: generationConfig,
+        });
+        break;
+      } catch (err: any) {
+        lastModelError = err;
+      }
+    }
+
+    if (!response) {
+      throw new Error(
+        lastModelError?.message ||
+          "No valid Gemini image generation model is available for this API key",
+      );
+    }
 
     //check if the reponse is valid
 

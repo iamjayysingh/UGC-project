@@ -14,10 +14,10 @@ export const getUserCredits = async (req: Request, res: Response) => {
     const user = await prisma.user.findUnique({
       where: { id: userId },
     });
-    res.json({ credits: user?.credits });
+    res.json({ credits: user?.credits ?? 0 });
   } catch (error: any) {
     Sentry.captureException(error);
-    res.status(500).json({ message: error.code || error.message });
+    res.status(500).json({ message: "Failed to fetch user credits" });
   }
 };
 

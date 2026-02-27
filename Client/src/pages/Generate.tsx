@@ -8,8 +8,16 @@ import {
   Wand2Icon,
 } from "lucide-react";
 import { PrimaryButton } from "../components/Buttons";
+import { useAuth, useUser } from "@clerk/clerk-react";
+import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
+import api from "../configs/axios";
 
 const Generate = () => {
+  const { user } = useUser();
+  const { getToken } = useAuth();
+  const navigate = useNavigate();
+
   const [name, setName] = useState("");
   const [productName, setProductName] = useState("");
   const [productDescription, setProductDescription] = useState("");
@@ -21,7 +29,7 @@ const Generate = () => {
 
   const handleFileChange = (
     e: React.ChangeEvent<HTMLInputElement>,
-    type: "product" | "model"
+    type: "product" | "model",
   ) => {
     if (e.target.files && e.target.files[0]) {
       if (type === "product") {
@@ -34,6 +42,40 @@ const Generate = () => {
 
   const handleGenerate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    if (!user) {
+      return toast("Please login to generate");
+    }
+    if (!productImage || !modelImage || !name || !productName || !aspectRatio) {
+      return toast("Please fill all the required fields");
+    }
+
+    try {
+      setIsGenerating(true);
+      const formData = new FormData();
+      formData.append("name", name);
+      formData.append("productName", productName);
+      formData.append("productDescription", productDescription);
+      formData.append("aspectRatio", aspectRatio);
+      formData.append("userPrompt", userPrompt);
+      formData.append("images", productImage);
+      formData.append("images", modelImage);
+
+      const token = await getToken();
+
+      const { data } = await api.post("/api/project/create", formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      toast.success(data.message);
+      navigate(`/result/${data.projectId}`);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      setIsGenerating(false);
+      toast.error(error.response?.data?.message || error.message);
+    }
   };
 
   return (

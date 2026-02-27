@@ -9,11 +9,18 @@ import type { Project } from "../../types";
 
 import { useEffect, useState } from "react";
 
-import { dummyGenerations } from "../assets/assets";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { GhostButton, PrimaryButton } from "../components/Buttons";
+import { useAuth, useUser } from "@clerk/clerk-react";
+import api from "../configs/axios";
+import { toast } from "react-hot-toast/headless";
 
 const Results = () => {
+  const { projectId } = useParams();
+  const { getToken } = useAuth();
+  const { user } = useUser();
+  const navigate = useNavigate();
+
   const [projects, setProjectsData] = useState<Project>({} as Project);
 
   const [loading, setLoading] = useState(true);
@@ -21,18 +28,77 @@ const Results = () => {
   const [isGenerating, setIsGenerating] = useState(false);
 
   const fetchProjectData = async () => {
-    setTimeout(() => {
-      setProjectsData(dummyGenerations[0]);
+    try {
+      const token = await getToken();
+      const { data } = await api.get(`api/user/projects/${projectId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      setProjectsData(data.project);
+      setIsGenerating(data.project.isGenerating);
       setLoading(false);
-    }, 3000);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || error.message);
+      console.log(error);
+    }
   };
 
+  // useEffect(() => {
+  //   fetchProjectData();
+  // }, []);
+
   useEffect(() => {
-    fetchProjectData();
-  }, []);
+    const loadData = async () => {
+      if (user && !projects.id) {
+        await fetchProjectData();
+      } else if (loading && !user) {
+        navigate("/");
+      }
+    };
+
+    loadData();
+  }, [user]);
+
+  //fetch project every 10s
+  useEffect(() => {
+    if (user && isGenerating) {
+      const interval = setInterval(() => {
+        fetchProjectData();
+      }, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [user, isGenerating]);
 
   const handleGenerateVideo = async () => {
     setIsGenerating(true);
+    try {
+      const token = await getToken();
+      const { data } = await api.post(
+        "api/project/video",
+        { projectId },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+      setProjectsData((prev) => ({
+        ...prev,
+        generatedVideo: data.videoUrl,
+        isGenerating: false,
+      }));
+
+      toast.success(data.message);
+
+      setIsGenerating(false);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || error.message);
+      console.log(error);
+    }
   };
 
   return loading ? (
@@ -61,7 +127,7 @@ const Results = () => {
           <div className="lg:col-span-2 space-y-6">
             <div className="glass-panel inline-block p-2 rounded-2xl">
               <div
-                className={`${projects?.aspectRatio === "9:16" ? "aspect-9/16" : "aspect-video"} `}
+                className={`${projects?.aspectRatio === "9:16" ? "aspect-9/16" : "aspect-video"} h-200 w-auto`}
               >
                 {projects?.generatedVideo ? (
                   <video
